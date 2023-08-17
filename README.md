@@ -14,9 +14,10 @@ This page presents necessary scripts for implementation of DNA shape profile ana
 <h3> Identification of potential TF targets </h3>
 	Generation of shape models based on static and ensemble respectively to find potential new gene targets. <br>
 <h3> Refining results and further analysis </h3>  <br>
-	Prospective downstream analysis <br>
- <br>
-The whole pipeline can be implemented using: <br>
+	Prospective downstream analysis such as gene ontology enrichment, specificity analyses, experimental validation (not included here) <br>
+<br>
+
+<h4> The whole pipeline can be implemented using: </h4> <br>
 	generate_TSS.R <br>
 	dna_shape_analysis.R <br>
 	visualization.R <br>
