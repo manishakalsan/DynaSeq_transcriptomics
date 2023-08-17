@@ -1,0 +1,141 @@
+#extract genes names of the associated promoters
+misclassed_data<-c("bed_misclass_tf_reg_static","bed_misclass_tf_reg_ens",
+                   "bed_misclass_others_static","bed_misclass_others_ens")
+tf_reg_genes_bed<-read.table("tf_reg_flank.bed",header=F)
+others_genes_bed<-read.table("others_flank.bed",header=F)
+genes_bed_names<-c("tf_reg_genes_bed","others_genes_bed")
+bed_id<-c(1,1,2,2)
+extracted_genes<-lapply(1:length(misclassed_data),function(i){
+   data<-as.data.frame(get(misclassed_data[i]))
+   data$V2<-as.integer(data$V2)
+   data$V3<-as.integer(data$V3)
+   # cat(str(data))
+   genes_data<-as.data.frame(get(genes_bed_names[bed_id[i]]))
+   # cat(str(genes_data))
+   extracted_genes<-merge(genes_data,data,by=c("V1","V2","V3"))
+   write.table(extracted_genes,file=paste(misclassed_data[i],"_genes",sep=""),
+               sep="\t",col.names = F,row.names = F,quote = F)
+   extracted_genes
+})
+
+# visualize shape of misclassified promoter regions along with 
+# average profiles of both sets of promoter regions
+regions_list<-c("misclass_others_ens","misclass_others_genes_static",
+                "misclass_tf_reg_ens","misclass_tf_reg_genes_static")
+shape<-lapply(1:length(regions_list), function(i){
+   dna_shape<-c()
+   if(i == 1 | i == 2){
+      dna_shape<-others_shape[grep(paste(get(regions_list[i]),collapse="|"),rownames(others_shape)),]
+   } else {
+      dna_shape<-tf_reg_shape[grep(paste(get(regions_list[i]),collapse="|"),rownames(tf_reg_shape)),]
+   }
+   dna_shape
+})
+names(shape)<-regions_list
+
+params<-c("Shear", "Stretch", "Stagger", "Buckle", "PropTw", "Opening", "Shift", "Slide", "Rise", "Tilt", "Roll", "Twist","MGW")
+seq_length<-20
+mmat<-lapply(1:length(shape),function(x){
+   print(x)
+   shape_data<-shape[[x]]
+   shape_data<-shape_data[,1:13]
+   table<-c()
+   print(head(shape_data))
+   num_pos<-(seq_length-4)
+   #calculate mean per position
+   col_mean_vals<-lapply(1:num_pos, function(i){
+      posi<- seq(i, dim(shape_data)[1], num_pos)
+      posi_data <- shape_data[posi,]
+      mean_vals<-colMeans(posi_data)
+      mean_vals
+   })
+   shape_means<-do.call(rbind,col_mean_vals)
+   rownames(shape_means)<-paste("pos",3:(seq_length-2),sep="_")
+   write.table(shape_means, file=paste("pos_mean_",regions_list[x],sep=""),sep="\t")
+   shape_means
+})
+
+for(i in 1:length(regions_list)){
+   assign(paste(regions_list[i],"_shape",sep=""),as.data.frame(mmat[[i]]))
+}
+
+mean_tf_reg<-read.table("pos_mean_5bin_dna_shape_tf_reg_genes_flank",header=T)
+mean_others<-read.table("pos_mean_5bin_dna_shape_remaining_genes_flank",header=T)
+
+pdf("misclassed_shape.pdf")
+par(mfrow=c(2,2))
+x_ticks<-seq(0,seq_length-4,2)[-1]
+x_labels<-seq(-(seq_length-4),1,2)[-1]
+width<-3
+for(i in 1:13){
+   data_a<-filter(as.numeric(misclass_others_genes_static_shape[,i]),filter = rep(1, width)) / width
+   data_b<-filter(as.numeric(misclass_tf_reg_genes_static_shape[,i]),filter = rep(1, width)) / width
+   data_c<-filter(as.numeric(mean_tf_reg[,i]),filter = rep(1, width)) / width
+   data_d<-filter(as.numeric(mean_others[,i]),filter = rep(1, width)) / width
+   min<-min(data_a[-c(1,16)],data_b[-c(1,16)],data_c[-c(1,16)],data_d[-c(1,16)])
+   max<-max(data_a[-c(1,16)],data_b[-c(1,16)],data_c[-c(1,16)],data_d[-c(1,16)])
+   plot(as.numeric(data_a),xlab="position",xaxt="n",yaxt="n", main="Comparison of shape profiles",
+        cex.main=0.8,type="l",ylab=params[i],col="coral",lwd=2,ylim=c(min,max),cex.sub=0.65,
+        sub="Promoter regions misclassified by static shape",lty=2)
+   axis(1,at=x_ticks,labels=x_labels,cex.axis=0.8) #x axis labels
+   axis(2,cex.axis=0.7,cex.lab=0.8,las=1) #y axis labels
+   lines(as.numeric(data_b),col="green4",type="l",lwd=2,lty=2)# adding other data lines
+   lines(as.numeric(data_c),col="coral",type="l",lwd=1)
+   lines(as.numeric(data_d),col="green4",type="l",lwd=1)
+   legend("bottomright",legend=c("others","tf regulated"),bty="n",pch=c(19,19),
+          col=c("coral","green4"),cex=0.8)
+}
+dev.off()
+
+
+#boxplot of average values of static parameters
+# if we say TF regulated to be positive class
+window_size<-as.numeric(4)
+
+par_misc_others_ens<-shape[[1]]
+par_misc_others_genes_static<-shape[[2]]
+par_misc_tf_reg_ens<-shape[[3]]
+par_misc_tf_reg_genes_static<-shape[[4]]
+pos_id<-seq(1,seq_length-4,window_size)
+
+for(i in 1:13){ # for each parameter
+   #extract data from each promoter set profile for a conformational parameter
+   pos_data_others<-binning_pos_data_static(others_shape,"others",window_size,i)
+   pos_data_tf_reg_shape<-binning_pos_data_static(tf_reg_shape,"tf_reg",window_size,i)
+   pos_data_misc_others_static<-binning_pos_data_static(par_misc_others_genes_static,"mispred_others",window_size,i)
+   pos_data_misc_tf_reg_static<-binning_pos_data_static(par_misc_tf_reg_genes_static,"mispred_tf_reg",window_size,i)
+   
+   #number of windows
+   bin_pos_num<-seq(1,seq_length-4,window_size)
+   
+   #list of data frames corresponding to positions in a window
+   pos_lists<-lapply(1:length(bin_pos_num), function(x){
+      data1<-as.matrix(pos_data_others[,bin_pos_num[x]:(bin_pos_num[x]+(window_size-1))])
+      data2<-as.matrix(pos_data_tf_reg_shape[,bin_pos_num[x]:(bin_pos_num[x]+(window_size-1))])
+      data3<-as.matrix(pos_data_misc_others_static[,bin_pos_num[x]:(bin_pos_num[x]+(window_size-1))])
+      data4<-as.matrix(pos_data_misc_tf_reg_static[,bin_pos_num[x]:(bin_pos_num[x]+(window_size-1))])
+      colnames(data1)<-colnames(data2)<-colnames(data3)<-colnames(data4)<-paste("pos_",(bin_pos_num[x]:(bin_pos_num[x]+(window_size-1)))+2,sep="")
+      list(data1,data2,data3,data4)
+   })
+   #melting the dataframes
+   all_melt_data<-lapply(1:length(pos_lists), function(x){
+      melt_data<-lapply(1:length(bin_pos_num),function(y){
+         df<-as.data.frame(pos_lists[[x]][[y]])
+         df_name<-rep(data_names[x],dim(pos_lists[[x]][[y]])[1])
+         window_name<-rep(paste("window",y,sep=""),dim(pos_lists[[x]][[y]])[1])
+         df<-cbind(df_name,window_name,df)
+         melt(df)
+      })
+      melt_data<-do.call(rbind,melt_data)
+   })
+   all_melt_data<-do.call(rbind,all_melt_data)
+   colnames(all_melt_data)=c("promoters","window_name","variable","value")
+   
+   #boxplot visualizations
+   plot<-ggplot(all_melt_data, aes(x = window_name, y = value, fill = promoters)) +
+      geom_boxplot() +
+      labs(x = "Position", y = paste(params[i]), title = "Original promoter shape profiles vs misclassified by static shape") +
+      theme_minimal()
+   print(plot)
+}
+
