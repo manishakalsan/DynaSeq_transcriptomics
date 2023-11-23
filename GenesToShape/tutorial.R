@@ -128,7 +128,6 @@ generate_shape <- function(list_files, x){
 mean_shapes <- function(file_name){
   shape_data<-as.matrix(read.table(file_name,header=T,stringsAsFactors = F))
   table<-c()
-  print(head(shape_data))
   num_pos<-(seq_length-4)
   #calculate mean per position
   col_mean_vals<-lapply(1:num_pos, function(i){
@@ -150,6 +149,7 @@ list_genes <- as.data.frame(read.table("list_genes", header = F))
 enrichment_result <- as.data.frame(enrichr(list_genes[,1], "TRANSFAC_and_JASPAR_PWMs"))
 write.table(enrichment_result,"enrichment_result",row.names = F,sep="\t",quote=F)
 
+# define which TF you wish to extract gene list for
 tf_regulated_genes <- as.data.frame(tf_reg_genes(enrichment_result, 0.05, 1))
 write.table(tf_regulated_genes,"tf_regulated_genes",col.names = F,row.names = F,sep="\t")
 
@@ -194,7 +194,49 @@ dna_shape_files<-system("ls dna_shape_*",intern=T)
 
 # generate mean profiles
 mmat<-lapply(1:length(dna_shape_files),function(x){
-  mean_shapes(dna_shape_files[x])
+  data<-mean_shapes(dna_shape_files[x])
 })
+
+list_pos_mean<-system("ls pos_mean*",intern=T)
+
+data<-read.table(list_pos_mean[1], header=T)
+
+pdf("plots_promoters_shape.pdf")
+par(mfrow=c(2,2))
+x_ticks<-seq(0,seq_length-4,2)[-1]
+x_labels<-seq(-(seq_length-4),1,2)[-1]
+width<-3
+for(i in 1:13){
+     plot(data[,i],xlab="position",main="DNA shape profiles", las=1,
+          cex.main=1,type="l",ylab=params[i],col="red",lwd=3,cex.sub=0.8,
+          sub="Promoter regions of DEGs regulated by TF", yaxt="n", xaxt="n")
+     axis(1,at=x_ticks,labels=x_labels,cex.axis=0.8) #x axis labels
+     axis(2,cex.axis=0.7,cex.lab=0.8,las=1) #y axis labels
+}
+dev.off()
+
+
+#boxplots for ensemble data
+dna_shape_files<-system("ls 5bin_dna_shape_*",intern=T)
+num_bins<-as.numeric(5)
+num_datasets<-as.numeric(1)
+data_variable_names<-c(paste("data",1:num_datasets,sep="_"))
+
+# # assign the shape profiles to variable names
+# for (i in 1:length(data_variable_names)) {
+#      assign(data_variable_names[i], read.table(dna_shape_files[i],header=T))
+# }
+
+pdf("ensemble_boxplots_5bin.pdf")
+par(mfrow=c(2,2))
+par_col<-seq(14,13+(13*num_bins),5)
+for(i in 1:13){
+     boxplot(list(data[,par_col[i]],data[,par_col[i]+1],
+                  data[,par_col[i]+2],data[,par_col[i]+3],
+                  data[,par_col[i]+4]),ylab=params[i], 
+             xlab="ensemble bins", las=1)
+     axis(1,at=seq(1,num_datasets*5,num_datasets),labels=c("bin 1", "bin 2", "bin 3", "bin 4", "bin 5"))
+}
+dev.off()
 
 
