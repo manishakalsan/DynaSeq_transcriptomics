@@ -234,7 +234,7 @@ for(i in 1:13){
      boxplot(list(data[,par_col[i]],data[,par_col[i]+1],
                   data[,par_col[i]+2],data[,par_col[i]+3],
                   data[,par_col[i]+4]),ylab=params[i], 
-             xlab="ensemble bins", las=1)
+             xlab="ensemble bins", las=1, xaxt="n")
      axis(1,at=seq(1,num_datasets*5,num_datasets),labels=c("bin 1", "bin 2", "bin 3", "bin 4", "bin 5"))
 }
 dev.off()
